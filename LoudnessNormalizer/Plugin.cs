@@ -1,4 +1,6 @@
-﻿//using LoudnessNormalizer.Installers;
+﻿using LoudnessNormalizer.Installers;
+using LoudnessNormalizer.HarmonyPatches;
+using HarmonyLib;
 using IPA;
 using IPA.Config;
 using IPA.Config.Stores;
@@ -10,12 +12,16 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using IPALogger = IPA.Logging.Logger;
+using System.Reflection;
 
 namespace LoudnessNormalizer
 {
     [Plugin(RuntimeOptions.SingleStartInit)]
     public class Plugin
     {
+        public static Harmony _harmony;
+        public const string HARMONY_ID = "com.github.rynan4818.LoudnessNormalizer";
+        public static string Name => "LoudnessNormalizer";
         internal static Plugin Instance { get; private set; }
         internal static IPALogger Log { get; private set; }
 
@@ -30,14 +36,15 @@ namespace LoudnessNormalizer
             Instance = this;
             Log = logger;
             Log.Info("LoudnessNormalizer initialized.");
+            _harmony = new Harmony(HARMONY_ID);
 
             //BSIPAのConfigを使用する場合はコメントを外します
-            //Configuration.PluginConfig.Instance = conf.Generated<Configuration.PluginConfig>();
-            //Log.Debug("Config loaded");
+            Configuration.PluginConfig.Instance = conf.Generated<Configuration.PluginConfig>();
+            Log.Debug("Config loaded");
 
             //使用するZenjectのインストーラーのコメントを外します
-            //zenjector.Install<LoudnessNormalizerAppInstaller>(Location.App);
-            //zenjector.Install<LoudnessNormalizerMenuInstaller>(Location.Menu);
+            zenjector.Install<LoudnessNormalizerAppInstaller>(Location.App);
+            zenjector.Install<LoudnessNormalizerMenuInstaller>(Location.Menu);
             //zenjector.Install<LoudnessNormalizerPlayerInstaller>(Location.Player);
         }
 
@@ -45,14 +52,14 @@ namespace LoudnessNormalizer
         public void OnApplicationStart()
         {
             Log.Debug("OnApplicationStart");
-
+            _harmony.PatchAll(Assembly.GetExecutingAssembly());
         }
 
         [OnExit]
         public void OnApplicationQuit()
         {
             Log.Debug("OnApplicationQuit");
-
+            _harmony?.UnpatchSelf();
         }
     }
 }

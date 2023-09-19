@@ -1,5 +1,4 @@
-﻿/*
-//using LoudnessNormalizer.Models;
+﻿using LoudnessNormalizer.Models;
 using Zenject;
 
 namespace LoudnessNormalizer.Installers
@@ -8,8 +7,8 @@ namespace LoudnessNormalizer.Installers
     {
         public override void InstallBindings()
         {
-            //this.Container.BindInterfacesAndSelfTo<LoudnessNormalizerController>().AsSingle().NonLazy();
+            this.Container.BindInterfacesAndSelfTo<LoudnessNormalizerController>().AsSingle();
+            this.Container.BindInterfacesAndSelfTo<SongDatabase>().AsSingle();
         }
     }
 }
-*/
