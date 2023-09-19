@@ -1,7 +1,7 @@
 ﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' 
 	xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
   <settings-container>
-    <button text='All Song Check Start' on-click='AllSongCheckStart'></button>
-    <button text='All Song Check Stop' on-click='AllSongCheckStop'></button>
+    <bool-setting text='All Song Check' value='AllSongCheck'></bool-setting>
+    <bool-setting text='Game Scene Check Stop' value='GameSceneCheckStop'></bool-setting>
   </settings-container>
 </bg>

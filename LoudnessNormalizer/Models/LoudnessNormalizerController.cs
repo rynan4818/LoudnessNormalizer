@@ -34,6 +34,8 @@ namespace LoudnessNormalizer.Models
         public readonly ConcurrentDictionary<string, Process> _ffmpegProcesses = new ConcurrentDictionary<string, Process>();
         public readonly string _ffmpegFilepath = Path.Combine(UnityGame.LibraryPath, "ffmpeg.exe");
         public bool _allSongCheckerActive;
+        public bool _allSongCheckerStop;
+        public bool _gamePlaySceneActive;
 
         public LoudnessNormalizerController(BeatmapLevelsModel beatmapLevelsModel, SongDatabase songDatabase)
         {
@@ -45,7 +47,7 @@ namespace LoudnessNormalizer.Models
             if (!this._disposedValue)
             {
                 if (disposing)
-                    _allSongCheckerActive = false;
+                    this._allSongCheckerActive = false;
                 this._disposedValue = true;
             }
         }
@@ -82,6 +84,7 @@ namespace LoudnessNormalizer.Models
         {
             if (this._allSongCheckerActive)
                 yield break;
+            this._allSongCheckerStop = false;
             this._allSongCheckerActive = true;
             var allSong = SongCore.Loader.CustomLevels;
             var count = 0;
@@ -89,6 +92,7 @@ namespace LoudnessNormalizer.Models
             foreach (string key in allSong.Keys)
             {
                 count++;
+                yield return new WaitWhile(() => this._allSongCheckerStop == true);
                 if (!this._allSongCheckerActive)
                     yield break;
                 var levelID = allSong[key].levelID;

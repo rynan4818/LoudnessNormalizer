@@ -10,6 +10,8 @@ namespace LoudnessNormalizer.Configuration
         public static PluginConfig Instance { get; set; }
         public static readonly string DefaultSongDatabaseFile = Path.Combine(IPA.Utilities.UnityGame.UserDataPath, "LoudnessNormalizerSongDatabase.json");
         public virtual string SongDatabaseFile { get; set; } = DefaultSongDatabaseFile;
+        public virtual bool AllSongCheck { get; set; } = true;
+        public virtual bool GameSceneCheckStop { get; set; } = true;
 
         /// <summary>
         /// これは、BSIPAが設定ファイルを読み込むたびに（ファイルの変更が検出されたときを含めて）呼び出されます

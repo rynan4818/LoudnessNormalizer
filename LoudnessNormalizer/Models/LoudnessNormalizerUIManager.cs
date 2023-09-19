@@ -9,16 +9,25 @@ namespace LoudnessNormalizer.Models
     {
         private bool _disposedValue;
         private StandardLevelDetailViewController _standardLevelDetail;
+        private PlatformLeaderboardViewController _platformLeaderboardViewController;
+        private LoudnessNormalizerController _loudnessNormalizerController;
         private readonly List<IBeatmapInfoUpdater> _beatmapInfoUpdaters;
-        public LoudnessNormalizerUIManager(StandardLevelDetailViewController standardLevelDetailViewController, List<IBeatmapInfoUpdater> iBeatmapInfoUpdaters)
+        public LoudnessNormalizerUIManager(StandardLevelDetailViewController standardLevelDetailViewController,
+            List<IBeatmapInfoUpdater> iBeatmapInfoUpdaters,
+            PlatformLeaderboardViewController platformLeaderboardViewController,
+            LoudnessNormalizerController loudnessNormalizerController)
         {
-            _standardLevelDetail = standardLevelDetailViewController;
-            _beatmapInfoUpdaters = iBeatmapInfoUpdaters;
+            this._standardLevelDetail = standardLevelDetailViewController;
+            this._beatmapInfoUpdaters = iBeatmapInfoUpdaters;
+            this._platformLeaderboardViewController = platformLeaderboardViewController;
+            this._loudnessNormalizerController = loudnessNormalizerController;
         }
         public void Initialize()
         {
-            _standardLevelDetail.didChangeDifficultyBeatmapEvent += StandardLevelDetail_didChangeDifficultyBeatmapEvent;
-            _standardLevelDetail.didChangeContentEvent += StandardLevelDetail_didChangeContentEvent;
+            this._standardLevelDetail.didChangeDifficultyBeatmapEvent += this.StandardLevelDetail_didChangeDifficultyBeatmapEvent;
+            this._standardLevelDetail.didChangeContentEvent += this.StandardLevelDetail_didChangeContentEvent;
+            this._platformLeaderboardViewController.didActivateEvent += this.OnLeaderboardActivated;
+            this._platformLeaderboardViewController.didDeactivateEvent += this.OnLeaderboardDeactivated;
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -26,8 +35,10 @@ namespace LoudnessNormalizer.Models
             {
                 if (disposing)
                 {
-                    _standardLevelDetail.didChangeDifficultyBeatmapEvent -= StandardLevelDetail_didChangeDifficultyBeatmapEvent;
-                    _standardLevelDetail.didChangeContentEvent -= StandardLevelDetail_didChangeContentEvent;
+                    this._standardLevelDetail.didChangeDifficultyBeatmapEvent -= this.StandardLevelDetail_didChangeDifficultyBeatmapEvent;
+                    this._standardLevelDetail.didChangeContentEvent -= this.StandardLevelDetail_didChangeContentEvent;
+                    this._platformLeaderboardViewController.didDeactivateEvent -= this.OnLeaderboardDeactivated;
+                    this._platformLeaderboardViewController.didActivateEvent -= this.OnLeaderboardActivated;
                 }
                 this._disposedValue = true;
             }
@@ -41,17 +52,25 @@ namespace LoudnessNormalizer.Models
         public void StandardLevelDetail_didChangeDifficultyBeatmapEvent(StandardLevelDetailViewController arg1, IDifficultyBeatmap arg2)
         {
             if (arg1 != null && arg2 != null)
-                DiffcultyBeatmapUpdated(arg2);
+                this.DiffcultyBeatmapUpdated(arg2);
         }
         public void StandardLevelDetail_didChangeContentEvent(StandardLevelDetailViewController arg1, StandardLevelDetailViewController.ContentType arg2)
         {
             if (arg1 != null && arg1.selectedDifficultyBeatmap != null)
-                DiffcultyBeatmapUpdated(arg1.selectedDifficultyBeatmap);
+                this.DiffcultyBeatmapUpdated(arg1.selectedDifficultyBeatmap);
         }
         private void DiffcultyBeatmapUpdated(IDifficultyBeatmap difficultyBeatmap)
         {
             foreach (var beatmapInfoUpdater in _beatmapInfoUpdaters)
                 beatmapInfoUpdater.BeatmapInfoUpdated(difficultyBeatmap);
+        }
+        public void OnLeaderboardActivated(bool firstactivation, bool addedtohierarchy, bool screensystemenabling)
+        {
+            this._loudnessNormalizerController._allSongCheckerStop = false;
+        }
+        public void OnLeaderboardDeactivated(bool removedFromHierarchy, bool screenSystemDisabling)
+        {
+            this._loudnessNormalizerController._allSongCheckerStop = true;
         }
     }
 }

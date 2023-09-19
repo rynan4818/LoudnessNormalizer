@@ -45,7 +45,7 @@ namespace LoudnessNormalizer
             //使用するZenjectのインストーラーのコメントを外します
             zenjector.Install<LoudnessNormalizerAppInstaller>(Location.App);
             zenjector.Install<LoudnessNormalizerMenuInstaller>(Location.Menu);
-            //zenjector.Install<LoudnessNormalizerPlayerInstaller>(Location.Player);
+            zenjector.Install<LoudnessNormalizerPlayerInstaller>(Location.Player);
         }
 
         [OnStart]
