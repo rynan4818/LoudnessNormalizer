@@ -1,6 +1,8 @@
 ﻿using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.GameplaySetup;
 using BeatSaberMarkupLanguage.ViewControllers;
+using LoudnessNormalizer.Models;
+using LoudnessNormalizer.Util;
 using System;
 using Zenject;
 
@@ -9,8 +11,15 @@ namespace LoudnessNormalizer.Views
     public class SettingTabViewController : BSMLAutomaticViewController, IInitializable, IDisposable
     {
         private bool _disposedValue;
+        private LoudnessNormalizerController _loudnessNormalizerController;
         public static readonly string _buttonName = "PlayerInfoViewer";
         public string ResourceName => string.Join(".", this.GetType().Namespace, this.GetType().Name);
+
+        [Inject]
+        public void Constractor(LoudnessNormalizerController loudnessNormalizerController)
+        {
+            this._loudnessNormalizerController = loudnessNormalizerController;
+        }
 
         public void Initialize()
         {
@@ -21,7 +30,10 @@ namespace LoudnessNormalizer.Views
             if (!this._disposedValue)
             {
                 if (disposing)
+                {
+                    this._loudnessNormalizerController._allSongCheckerActive = false;
                     GameplaySetup.instance?.RemoveTab(Plugin.Name);
+                }
                 this._disposedValue = true;
             }
         }
@@ -32,9 +44,15 @@ namespace LoudnessNormalizer.Views
             GC.SuppressFinalize(this);
         }
 
-        [UIAction("CashClear")]
-        private void CashClear()
+        [UIAction("AllSongCheckStart")]
+        private void AllSongCheckStart()
         {
+            CoroutineStarter.Instance.StartCoroutine(this._loudnessNormalizerController.AllSongChekerCoroutine());
+        }
+        [UIAction("AllSongCheckStop")]
+        private void AllSongCheckStop()
+        {
+            this._loudnessNormalizerController._allSongCheckerActive = false;
         }
         [UIAction("#post-parse")]
         internal void PostParse()

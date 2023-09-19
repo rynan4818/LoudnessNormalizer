@@ -16,10 +16,11 @@ using System.Text.RegularExpressions;
 
 namespace LoudnessNormalizer.Models
 {
-    public class LoudnessNormalizerController : IBeatmapInfoUpdater
+    public class LoudnessNormalizerController : IBeatmapInfoUpdater, IDisposable
     {
         private BeatmapLevelsModel _beatmapLevelsModel;
         private SongDatabase _songDatabase;
+        private bool _disposedValue;
         public static readonly string VolumedetectOption = "-hide_banner -vn -af volumedetect -f null -";
         public static readonly string LoudnormSurveyOption = "-hide_banner -vn -af \"loudnorm=print_format=json\" -f null -";
         public static readonly string Ebur128Option = "-hide_banner -vn -filter_complex ebur128=framelog=verbose -f null -";
@@ -32,12 +33,29 @@ namespace LoudnessNormalizer.Models
         public CancellationTokenSource _cancellationTokenSource;
         public readonly ConcurrentDictionary<string, Process> _ffmpegProcesses = new ConcurrentDictionary<string, Process>();
         public readonly string _ffmpegFilepath = Path.Combine(UnityGame.LibraryPath, "ffmpeg.exe");
+        public bool _allSongCheckerActive;
 
         public LoudnessNormalizerController(BeatmapLevelsModel beatmapLevelsModel, SongDatabase songDatabase)
         {
             this._beatmapLevelsModel = beatmapLevelsModel;
             this._songDatabase = songDatabase;
         }
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!this._disposedValue)
+            {
+                if (disposing)
+                    _allSongCheckerActive = false;
+                this._disposedValue = true;
+            }
+        }
+        public void Dispose()
+        {
+            // このコードを変更しないでください。クリーンアップ コードを 'Dispose(bool disposing)' メソッドに記述します
+            this.Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
         public void BeatmapInfoUpdated(IDifficultyBeatmap beatmap)
         {
             if (beatmap == null)
@@ -47,7 +65,7 @@ namespace LoudnessNormalizer.Models
             var songData = this._songDatabase.GetSongData(levelID);
             if (songData.Org == null)
             {
-                CoroutineStarter.Instance.StartCoroutine(LoudnessSurvey(levelID, songData));
+                CoroutineStarter.Instance.StartCoroutine(this.LoudnessSurveyCoroutine(levelID, songData));
             }
             else
             {
@@ -58,6 +76,31 @@ namespace LoudnessNormalizer.Models
                 {
                 }
             }
+        }
+
+        public IEnumerator AllSongChekerCoroutine()
+        {
+            if (this._allSongCheckerActive)
+                yield break;
+            this._allSongCheckerActive = true;
+            var allSong = SongCore.Loader.CustomLevels;
+            var count = 0;
+            var max = allSong.Count;
+            foreach (string key in allSong.Keys)
+            {
+                count++;
+                if (!this._allSongCheckerActive)
+                    yield break;
+                var levelID = allSong[key].levelID;
+                var songPreviewAudioClipPath = allSong[key].songPreviewAudioClipPath;
+                var songData = this._songDatabase.GetSongData(levelID);
+                if (songData.Org == null)
+                {
+                    Plugin.Log.Info($"{count}/{max}:{levelID}");
+                    yield return this.LoudnessSurveyCoroutine(levelID, songData, true, songPreviewAudioClipPath);
+                }
+            }
+            this._allSongCheckerActive = false;
         }
 
         public IEnumerator LoudnessChange(string levelID, SongData songData)
@@ -75,17 +118,22 @@ namespace LoudnessNormalizer.Models
             this._beatmapLevelsModel.ClearLoadedBeatmapLevelsCaches();
         }
 
-        public IEnumerator LoudnessSurvey(string levelID, SongData songData, bool original = true)
+        public IEnumerator LoudnessSurveyCoroutine(string levelID, SongData songData, bool original = true, string songAudioClipPath = null)
         {
             var timer = new Stopwatch();
             timer.Start();
             var loudnessData = new LoudnessData();
-            var getSongPath = GetSongAudioClipPathAsync(levelID);
-            yield return getSongPath;
-            var songAudioClipPath = getSongPath.Result;
+            if (songAudioClipPath == null)
+            {
+                //GetBeatmapLevelAsyncはメニューに今表示しているやつじゃないと検索できない
+                //AllSongChekerとかで呼ぶとフリーズする
+                var getSongPath = GetSongAudioClipPathAsync(levelID);
+                yield return getSongPath;
+                songAudioClipPath = getSongPath.Result;
+            }
             if (songAudioClipPath == null)
                 yield break;
-            yield return FFmpegRun(outputLine => { }, errorLine =>
+            yield return FFmpegRunCoroutine(outputLine => { }, errorLine =>
             {
                 float value;
                 var match = VolumedetectRegex.Match(errorLine);
@@ -105,7 +153,7 @@ namespace LoudnessNormalizer.Models
                 }
             }, songAudioClipPath, VolumedetectOption);
             yield return new WaitWhile(() => this._ffmpegProcesses.TryGetValue(songAudioClipPath, out _));
-            yield return FFmpegRun(outputLine => { }, errorLine =>
+            yield return FFmpegRunCoroutine(outputLine => { }, errorLine =>
             {
                 var integratedLoundness = true;
                 float value;
@@ -151,12 +199,12 @@ namespace LoudnessNormalizer.Models
             else
                 songData.Now = loudnessData;
             this._songDatabase.SaveSongData(levelID, songData);
-            Plugin.Log.Info($"Loudness Survey: {timer.Elapsed.TotalMilliseconds}ms : I:{loudnessData.I}  LRA:{loudnessData.LRA}  MEAN:{loudnessData.MEAN}  MAX:{loudnessData.MAX} :{levelID}");
+            Plugin.Log.Info($"Loudness survey time:{timer.Elapsed.TotalMilliseconds}ms  I:{loudnessData.I}  LRA:{loudnessData.LRA}  LRA low:{loudnessData.LRAlow}  LRA high:{loudnessData.LRAhigh}  MEAN V:{loudnessData.MEAN}  MAX V:{loudnessData.MAX}  id:{levelID}");
             timer.Stop();
         }
 
 
-        public IEnumerator FFmpegRun(Action<string> outputLine, Action<string> errorLine, string songAudioClipPath, string option)
+        public IEnumerator FFmpegRunCoroutine(Action<string> outputLine, Action<string> errorLine, string songAudioClipPath, string option)
         {
             var arguments = $"-i \"{songAudioClipPath}\" {option}";
             using (var ffmpegProcess = FFmpegProcess(songAudioClipPath, arguments))
@@ -200,6 +248,7 @@ namespace LoudnessNormalizer.Models
                 var startProcessTimeout = new TimeoutTimer(10);
                 yield return new WaitUntil(() => IsProcessRunning(ffmpegProcess) || startProcessTimeout.HasTimedOut);
                 startProcessTimeout.Stop();
+                yield return new WaitUntil(() => !IsProcessRunning(ffmpegProcess) || timeout.HasTimedOut);
                 if (timeout.HasTimedOut)
                 {
                     yield return new WaitForSeconds(5f);
@@ -269,7 +318,7 @@ namespace LoudnessNormalizer.Models
                     CreateNoWindow = true
                 },
                 EnableRaisingEvents = true,
-                PriorityBoostEnabled = true
+                PriorityBoostEnabled = false
             };
             this._ffmpegProcesses.TryAdd(songAudioClipPath, process);
             return process;
