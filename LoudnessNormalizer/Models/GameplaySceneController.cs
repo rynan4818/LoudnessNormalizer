@@ -13,16 +13,15 @@ namespace LoudnessNormalizer.Models
         }
         public void Initialize()
         {
-            this._loudnessNormalizerController._gamePlaySceneActive = true;
+            this._loudnessNormalizerController._allSongCheckerBreak = true;
+            this._loudnessNormalizerController._gameSceneActive = true;
         }
         protected virtual void Dispose(bool disposing)
         {
             if (!this._disposedValue)
             {
                 if (disposing)
-                {
-                    this._loudnessNormalizerController._gamePlaySceneActive = false;
-                }
+                    this._loudnessNormalizerController._gameSceneActive = false;
                 this._disposedValue = true;
             }
         }

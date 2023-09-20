@@ -21,9 +21,9 @@ namespace LoudnessNormalizer.Models
         private BeatmapLevelsModel _beatmapLevelsModel;
         private SongDatabase _songDatabase;
         private bool _disposedValue;
-        public static readonly string VolumedetectOption = "-hide_banner -vn -af volumedetect -f null -";
-        public static readonly string LoudnormSurveyOption = "-hide_banner -vn -af \"loudnorm=print_format=json\" -f null -";
-        public static readonly string Ebur128Option = "-hide_banner -vn -filter_complex ebur128=framelog=verbose -f null -";
+        public static readonly string VolumedetectOption = "-hide_banner -y -vn -af volumedetect -f null -";
+        public static readonly string LoudnormSurveyOption = "-hide_banner -y -vn -af \"loudnorm=print_format=json\" -f null -";
+        public static readonly string Ebur128Option = "-hide_banner -y -vn -filter_complex ebur128=framelog=verbose -f null -";
         public static readonly Regex VolumedetectRegex = new Regex(@"\[Parsed_volumedetect[^\]]+\] (\w+): ([-\d\.]+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         public static readonly Regex Ebur128ILRegex = new Regex(@" +Integrated loudness:", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         public static readonly Regex Ebur128LRRegex = new Regex(@" +Loudness range:", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -33,9 +33,11 @@ namespace LoudnessNormalizer.Models
         public CancellationTokenSource _cancellationTokenSource;
         public readonly ConcurrentDictionary<string, Process> _ffmpegProcesses = new ConcurrentDictionary<string, Process>();
         public readonly string _ffmpegFilepath = Path.Combine(UnityGame.LibraryPath, "ffmpeg.exe");
-        public bool _allSongCheckerActive;
-        public bool _allSongCheckerStop;
-        public bool _gamePlaySceneActive;
+        public bool _allSongCheckerActive { get; set; } = false;
+        public bool _allSongCheckerBreak { get; set; } = false;
+        public bool _allSongCheckDone { get; set; } = false;
+        public bool _gameSceneActive { get; set; } = false;
+        public int _allSongCheckCount { get; set; } = 0;
 
         public LoudnessNormalizerController(BeatmapLevelsModel beatmapLevelsModel, SongDatabase songDatabase)
         {
@@ -47,7 +49,7 @@ namespace LoudnessNormalizer.Models
             if (!this._disposedValue)
             {
                 if (disposing)
-                    this._allSongCheckerActive = false;
+                    this._allSongCheckerBreak = true;
                 this._disposedValue = true;
             }
         }
@@ -60,6 +62,8 @@ namespace LoudnessNormalizer.Models
 
         public void BeatmapInfoUpdated(IDifficultyBeatmap beatmap)
         {
+            if (!this._songDatabase._init)
+                return;
             if (beatmap == null)
                 return;
             this._selectedBeatmap = beatmap;
@@ -82,19 +86,25 @@ namespace LoudnessNormalizer.Models
 
         public IEnumerator AllSongChekerCoroutine()
         {
+            if (!this._songDatabase._init)
+                yield break;
             if (this._allSongCheckerActive)
                 yield break;
-            this._allSongCheckerStop = false;
-            this._allSongCheckerActive = true;
             var allSong = SongCore.Loader.CustomLevels;
-            var count = 0;
             var max = allSong.Count;
+            if (this._allSongCheckDone && this._allSongCheckCount == max)
+                yield break;
+            this._allSongCheckerActive = true;
+            var count = 0;
             foreach (string key in allSong.Keys)
             {
-                count++;
-                yield return new WaitWhile(() => this._allSongCheckerStop == true);
-                if (!this._allSongCheckerActive)
+                if (this._allSongCheckerBreak)
+                {
+                    this._allSongCheckerActive = false;
+                    this._allSongCheckerBreak = false;
                     yield break;
+                }
+                count++;
                 var levelID = allSong[key].levelID;
                 var songPreviewAudioClipPath = allSong[key].songPreviewAudioClipPath;
                 var songData = this._songDatabase.GetSongData(levelID);
@@ -104,6 +114,8 @@ namespace LoudnessNormalizer.Models
                     yield return this.LoudnessSurveyCoroutine(levelID, songData, true, songPreviewAudioClipPath);
                 }
             }
+            this._allSongCheckCount = max;
+            this._allSongCheckDone = true;
             this._allSongCheckerActive = false;
         }
 

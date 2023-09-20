@@ -10,6 +10,7 @@ namespace LoudnessNormalizer.Installers
         {
             this.Container.BindInterfacesAndSelfTo<SettingTabViewController>().FromNewComponentAsViewController().AsSingle().NonLazy();
             this.Container.BindInterfacesAndSelfTo<LoudnessNormalizerUIManager>().AsSingle().NonLazy();
+            this.Container.BindInterfacesAndSelfTo<MenuSceneComponent>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
             //this.Container.BindInterfacesAndSelfTo<ConfigViewController>().FromNewComponentAsViewController().AsSingle().NonLazy();
         }
     }

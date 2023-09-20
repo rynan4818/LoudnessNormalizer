@@ -1,12 +1,13 @@
 ﻿using LoudnessNormalizer.Configuration;
 using LoudnessNormalizer.Util;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using Zenject;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 using System.Collections;
+using UnityEngine;
+using System.Collections.Concurrent;
 
 namespace LoudnessNormalizer.Models
 {
@@ -32,12 +33,12 @@ namespace LoudnessNormalizer.Models
     public class SongDatabase : IInitializable, IDisposable
     {
         private bool _disposedValue;
-        public Dictionary<string, SongData> _songDatabase { get; set; } = new Dictionary<string, SongData>();
+        public ConcurrentDictionary<string, SongData> _songDatabase { get; set; } = new ConcurrentDictionary<string, SongData>();
         public bool _init;
         public bool _writeDatabase = false;
         public void Initialize()
         {
-            _= this.InitSongDatabase();
+            _= this.InitSongDatabaseAsync();
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -55,6 +56,11 @@ namespace LoudnessNormalizer.Models
             GC.SuppressFinalize(this);
         }
 
+        public int DatabaseCount()
+        {
+            return this._songDatabase.Count;
+        }
+
         public SongData GetSongData(string levelID)
         {
             if (this._songDatabase.TryGetValue(levelID, out SongData songData))
@@ -64,28 +70,29 @@ namespace LoudnessNormalizer.Models
 
         public void SaveSongData(string levelID, SongData songData)
         {
-            if (this._init == false)
+            if (!this._init)
                 return;
             if (levelID == null || songData == null)
                 return;
             if (this._songDatabase.ContainsKey(levelID))
                 this._songDatabase[levelID] = songData;
             else
-                this._songDatabase.Add(levelID, songData);
+                this._songDatabase.TryAdd(levelID, songData);
             CoroutineStarter.Instance.StartCoroutine(SaveSongDatabaseCoroutine(levelID));
         }
         public IEnumerator SaveSongDatabaseCoroutine(string levelID)
         {
-            yield return this.SaveSongDatabase();
+            yield return new WaitWhile(() => this._writeDatabase == true);
+            yield return this.SaveSongDatabaseAsync();
         }
 
-        public async Task InitSongDatabase()
+        public async Task InitSongDatabaseAsync()
         {
             Plugin.Log?.Info("Init Start");
             this._init = false;
             if (!File.Exists(PluginConfig.Instance.SongDatabaseFile)) {
-                this._songDatabase = new Dictionary<string, SongData>();
-                await this.SaveSongDatabase();
+                this._songDatabase = new ConcurrentDictionary<string, SongData>();
+                await this.SaveSongDatabaseAsync();
                 this._init = true;
                 return;
             }
@@ -94,7 +101,7 @@ namespace LoudnessNormalizer.Models
             {
                 if (json == null)
                     throw new JsonReaderException("Json file error songdatabase");
-                this._songDatabase = JsonConvert.DeserializeObject<Dictionary<string, SongData>>(json);
+                this._songDatabase = JsonConvert.DeserializeObject<ConcurrentDictionary<string, SongData>>(json);
                 if (this._songDatabase == null)
                     throw new JsonReaderException("Empty json songdatabase");
             }
@@ -110,23 +117,23 @@ namespace LoudnessNormalizer.Models
                         json = await this.ReadAllTextAsync(backup.FullName);
                         if (json == null)
                             throw new JsonReaderException("Backup json file error songdatabase");
-                        this._songDatabase = JsonConvert.DeserializeObject<Dictionary<string, SongData>>(json);
+                        this._songDatabase = JsonConvert.DeserializeObject<ConcurrentDictionary<string, SongData>>(json);
                         if (this._songDatabase == null)
                             throw new JsonReaderException("Failed restore songdatabase");
                     }
                     catch (JsonException ex2)
                     {
                         Plugin.Log?.Error(ex2.ToString());
-                        this._songDatabase = new Dictionary<string, SongData>();
+                        this._songDatabase = new ConcurrentDictionary<string, SongData>();
                     }
                 }
                 else
-                    this._songDatabase = new Dictionary<string, SongData>();
-                await this.SaveSongDatabase();
+                    this._songDatabase = new ConcurrentDictionary<string, SongData>();
+                await this.SaveSongDatabaseAsync();
             }
             this._init = true;
         }
-        public async Task SaveSongDatabase()
+        public async Task SaveSongDatabaseAsync()
         {
             if (this._writeDatabase)
                 return;

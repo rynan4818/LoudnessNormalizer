@@ -7,7 +7,7 @@ namespace LoudnessNormalizer.Installers
     {
         public override void InstallBindings()
         {
-            this.Container.BindInterfacesAndSelfTo<GameplaySceneController>().FromNewComponentOnNewGameObject().AsCached().NonLazy();
+            this.Container.BindInterfacesAndSelfTo<GameplaySceneController>().AsCached();
         }
     }
 }

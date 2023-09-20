@@ -10,17 +10,15 @@ namespace LoudnessNormalizer.Models
         private bool _disposedValue;
         private StandardLevelDetailViewController _standardLevelDetail;
         private PlatformLeaderboardViewController _platformLeaderboardViewController;
-        private LoudnessNormalizerController _loudnessNormalizerController;
         private readonly List<IBeatmapInfoUpdater> _beatmapInfoUpdaters;
+        public bool _leaderboardActivated { get; private set; } = false;
         public LoudnessNormalizerUIManager(StandardLevelDetailViewController standardLevelDetailViewController,
             List<IBeatmapInfoUpdater> iBeatmapInfoUpdaters,
-            PlatformLeaderboardViewController platformLeaderboardViewController,
-            LoudnessNormalizerController loudnessNormalizerController)
+            PlatformLeaderboardViewController platformLeaderboardViewController)
         {
             this._standardLevelDetail = standardLevelDetailViewController;
             this._beatmapInfoUpdaters = iBeatmapInfoUpdaters;
             this._platformLeaderboardViewController = platformLeaderboardViewController;
-            this._loudnessNormalizerController = loudnessNormalizerController;
         }
         public void Initialize()
         {
@@ -66,11 +64,11 @@ namespace LoudnessNormalizer.Models
         }
         public void OnLeaderboardActivated(bool firstactivation, bool addedtohierarchy, bool screensystemenabling)
         {
-            this._loudnessNormalizerController._allSongCheckerStop = false;
+            this._leaderboardActivated = true;
         }
         public void OnLeaderboardDeactivated(bool removedFromHierarchy, bool screenSystemDisabling)
         {
-            this._loudnessNormalizerController._allSongCheckerStop = true;
+            this._leaderboardActivated = false;
         }
     }
 }
