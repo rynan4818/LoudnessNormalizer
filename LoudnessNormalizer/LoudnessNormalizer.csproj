@@ -149,7 +149,7 @@
     <Compile Include="Interfaces\IBeatmapInfoUpdater.cs" />
     <Compile Include="Models\GameplaySceneController.cs" />
     <Compile Include="Models\LoudnessNormalizerController.cs" />
-    <Compile Include="Models\LoudnessNormalizerUIManager.cs" />
+    <Compile Include="Models\UIManager.cs" />
     <Compile Include="Models\MenuSceneComponent.cs" />
     <Compile Include="Models\SongDatabase.cs" />
     <Compile Include="Plugin.cs" />

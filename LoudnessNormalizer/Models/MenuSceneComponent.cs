@@ -12,10 +12,10 @@ namespace LoudnessNormalizer.Models
 	public class MenuSceneComponent : MonoBehaviour
     {
         private LoudnessNormalizerController _loudnessNormalizerController;
-        private LoudnessNormalizerUIManager _loudnessNormalizerUIManager;
+        private UIManager _loudnessNormalizerUIManager;
         private SongDatabase _songDatabase;
         [Inject]
-        public void Constractor(LoudnessNormalizerUIManager loudnessNormalizerUIManager, LoudnessNormalizerController loudnessNormalizerController, SongDatabase songDatabase)
+        public void Constractor(UIManager loudnessNormalizerUIManager, LoudnessNormalizerController loudnessNormalizerController, SongDatabase songDatabase)
         {
             this._loudnessNormalizerController = loudnessNormalizerController;
             this._songDatabase = songDatabase;

@@ -5,14 +5,14 @@ using Zenject;
 
 namespace LoudnessNormalizer.Models
 {
-    public class LoudnessNormalizerUIManager : IInitializable, IDisposable
+    public class UIManager : IInitializable, IDisposable
     {
         private bool _disposedValue;
         private StandardLevelDetailViewController _standardLevelDetail;
         private PlatformLeaderboardViewController _platformLeaderboardViewController;
         private readonly List<IBeatmapInfoUpdater> _beatmapInfoUpdaters;
         public bool _leaderboardActivated { get; private set; } = false;
-        public LoudnessNormalizerUIManager(StandardLevelDetailViewController standardLevelDetailViewController,
+        public UIManager(StandardLevelDetailViewController standardLevelDetailViewController,
             List<IBeatmapInfoUpdater> iBeatmapInfoUpdaters,
             PlatformLeaderboardViewController platformLeaderboardViewController)
         {
