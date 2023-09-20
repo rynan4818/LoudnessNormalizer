@@ -1,6 +1,10 @@
 ﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' 
 	xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
   <settings-container>
+    <text id='IntegratedLoudness' align='Left' font-size='3' size-delta-x='100' size-delta-y='4'></text>
+    <text id='LoudnessRange' align='Left' font-size='3' size-delta-x='100' size-delta-y='4'></text>
+    <text id='Volumedetect' align='Left' font-size='3' size-delta-x='100' size-delta-y='4'></text>
+    <text id='CheckSongCount' align='Center' font-size='4' size-delta-x='100' size-delta-y='6'></text>
     <bool-setting text='All Song Check' value='AllSongCheck' apply-on-change="true"></bool-setting>
   </settings-container>
 </bg>
