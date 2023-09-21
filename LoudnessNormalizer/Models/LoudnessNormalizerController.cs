@@ -223,7 +223,7 @@ namespace LoudnessNormalizer.Models
             this._songDatabase.SaveSongData(levelID, songData);
             Plugin.Log.Info($"Loudness survey time:{timer.Elapsed.TotalMilliseconds}ms  I:{loudnessData.I}  LRA:{loudnessData.LRA}  LRA low:{loudnessData.LRAlow}  LRA high:{loudnessData.LRAhigh}  MEAN V:{loudnessData.MEAN}  MAX V:{loudnessData.MAX}  id:{levelID}");
             timer.Stop();
-            if (loudnessUpdate)
+            if (loudnessUpdate && this._selectedBeatmap.level.levelID == levelID)
                 this.OnLoudnessUpdate?.Invoke(loudnessData);
             this.OnCheckSongCountUpdate?.Invoke(this._songDatabase.DatabaseCount(), SongCore.Loader.CustomLevels.Count);
         }
