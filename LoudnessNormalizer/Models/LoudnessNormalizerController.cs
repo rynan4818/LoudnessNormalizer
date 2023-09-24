@@ -1,26 +1,19 @@
-﻿using LoudnessNormalizer.Interfaces;
-using LoudnessNormalizer.Util;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using System.Threading;
 using System.Collections;
 using System.Diagnostics;
-using System.Collections.Concurrent;
 using System.IO;
-using IPA.Utilities;
-using IPA.Utilities.Async;
-using System.Text;
 using System;
 using UnityEngine;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace LoudnessNormalizer.Models
 {
-    public class LoudnessNormalizerController : IBeatmapInfoUpdater
+    public class LoudnessNormalizerController
     {
         private BeatmapLevelsModel _beatmapLevelsModel;
         private SongDatabase _songDatabase;
-        private bool _disposedValue;
+        private FFmpegController _ffmpegController;
         public static readonly string VolumedetectOption = "-hide_banner -y -vn -af volumedetect -f null -";
         public static readonly string LoudnormSurveyOption = "-hide_banner -y -vn -af \"loudnorm=print_format=json\" -f null -";
         public static readonly string Ebur128Option = "-hide_banner -y -vn -filter_complex ebur128=framelog=verbose -f null -";
@@ -29,12 +22,8 @@ namespace LoudnessNormalizer.Models
         public static readonly Regex Ebur128LRRegex = new Regex(@" +Loudness range:", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         public static readonly Regex Ebur128Regex = new Regex(@" +(\w[\w ]*): +([-\d\.]+) \w+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         public static readonly Regex LoudnormRegex = new Regex(@"Parsed_loudnorm", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        public IDifficultyBeatmap _selectedBeatmap;
         public CancellationTokenSource _cancellationTokenSource;
-        public readonly ConcurrentDictionary<string, Process> _ffmpegProcesses = new ConcurrentDictionary<string, Process>();
-        public readonly string _ffmpegFilepath = Path.Combine(UnityGame.LibraryPath, "ffmpeg.exe");
-        public event Action<LoudnessData> OnLoudnessUpdate;
-        public event Action<int, int> OnCheckSongCountUpdate;
+        public event Action<bool, string, LoudnessData> OnLoudnessSurveyUpdate;
         public string _selectCheckLevelID;
         public string _allCheckLevelID;
         public bool _allSongCheckerActive { get; set; } = false;
@@ -43,38 +32,11 @@ namespace LoudnessNormalizer.Models
         public bool _gameSceneActive { get; set; } = false;
         public int _allSongCheckCount { get; set; } = 0;
 
-        public LoudnessNormalizerController(BeatmapLevelsModel beatmapLevelsModel, SongDatabase songDatabase)
+        public LoudnessNormalizerController(BeatmapLevelsModel beatmapLevelsModel, SongDatabase songDatabase, FFmpegController ffmpegController)
         {
             this._beatmapLevelsModel = beatmapLevelsModel;
             this._songDatabase = songDatabase;
-        }
-
-        public void BeatmapInfoUpdated(IDifficultyBeatmap beatmap)
-        {
-            if (!this._songDatabase._init)
-                return;
-            if (beatmap == null)
-                return;
-            this._selectedBeatmap = beatmap;
-            var levelID = beatmap.level.levelID;
-            var songData = this._songDatabase.GetSongData(levelID);
-            LoudnessData loudnessData = null;
-            if (songData.Org == null)
-            {
-                CoroutineStarter.Instance.StartCoroutine(SlectSongCheckerCoroutine(levelID, songData));
-            }
-            else
-            {
-                if (songData.Now == null)
-                {
-                    loudnessData = songData.Org;
-                }
-                else
-                {
-                    loudnessData = songData.Now;
-                }
-            }
-            this.OnLoudnessUpdate?.Invoke(loudnessData);
+            this._ffmpegController = ffmpegController;
         }
 
         public IEnumerator SlectSongCheckerCoroutine(string levelID, SongData songData)
@@ -155,7 +117,7 @@ namespace LoudnessNormalizer.Models
             if (songAudioClipPath == null)
                 yield break;
             var ffmpeg_error = true;
-            yield return FFmpegRunCoroutine(outputLine => { }, errorLine =>
+            yield return this._ffmpegController.FFmpegRunCoroutine(outputLine => { }, errorLine =>
             {
                 float value;
                 var match = VolumedetectRegex.Match(errorLine);
@@ -175,11 +137,11 @@ namespace LoudnessNormalizer.Models
                     }
                 }
             }, songAudioClipPath, VolumedetectOption);
-            yield return new WaitWhile(() => this._ffmpegProcesses.TryGetValue(songAudioClipPath, out _));
+            yield return new WaitWhile(() => this._ffmpegController._ffmpegProcesses.TryGetValue(songAudioClipPath, out _));
             if (ffmpeg_error)
                 yield break;
             ffmpeg_error = true;
-            yield return FFmpegRunCoroutine(outputLine => { }, errorLine =>
+            yield return this._ffmpegController.FFmpegRunCoroutine(outputLine => { }, errorLine =>
             {
                 var integratedLoundness = true;
                 float value;
@@ -220,7 +182,7 @@ namespace LoudnessNormalizer.Models
                     }
                 }
             }, songAudioClipPath, Ebur128Option);
-            yield return new WaitWhile(() => this._ffmpegProcesses.TryGetValue(songAudioClipPath, out _));
+            yield return new WaitWhile(() => this._ffmpegController._ffmpegProcesses.TryGetValue(songAudioClipPath, out _));
             if (ffmpeg_error)
                 yield break;
             if (original)
@@ -230,68 +192,7 @@ namespace LoudnessNormalizer.Models
             this._songDatabase.SaveSongData(levelID, songData);
             Plugin.Log.Info($"Loudness survey time:{timer.Elapsed.TotalMilliseconds}ms  I:{loudnessData.I}  LRA:{loudnessData.LRA}  LRA low:{loudnessData.LRAlow}  LRA high:{loudnessData.LRAhigh}  MEAN V:{loudnessData.MEAN}  MAX V:{loudnessData.MAX}  id:{levelID}");
             timer.Stop();
-            if (loudnessUpdate && this._selectedBeatmap.level.levelID == levelID)
-                this.OnLoudnessUpdate?.Invoke(loudnessData);
-            this.OnCheckSongCountUpdate?.Invoke(this._songDatabase.DatabaseCount(), SongCore.Loader.CustomLevels.Count);
-        }
-
-
-        public IEnumerator FFmpegRunCoroutine(Action<string> outputLine, Action<string> errorLine, string songAudioClipPath, string option)
-        {
-            var arguments = $"-i \"{songAudioClipPath}\" {option}";
-            using (var ffmpegProcess = FFmpegProcess(songAudioClipPath, arguments))
-            using (var ctoken = new CancellationTokenSource())
-            {
-                if (ffmpegProcess == null)
-                    yield break;
-                ffmpegProcess.Exited += (sender, e) => { ctoken.Cancel(); };
-                ffmpegProcess.Disposed += (sender, e) => { FFmpegProcessDisposed((Process)sender); };
-                if (!ffmpegProcess.Start())
-                {
-                    Plugin.Log.Info("Faile to start ffmpeg process");
-                    yield break;
-                }
-                var outputRead = Task.Run(() =>
-                {
-                    while (true)
-                    {
-                        var l = ffmpegProcess.StandardOutput.ReadLine();
-                        if (l == null)
-                            break;
-                        outputLine?.Invoke(l);
-                    }
-                });
-                var errorRead = Task.Run(() =>
-                {
-                    while (true)
-                    {
-                        var l = ffmpegProcess.StandardError.ReadLine();
-                        if (l == null)
-                            break;
-                        errorLine?.Invoke(l);
-                    }
-                });
-                var processWait = Task.Run(() =>
-                {
-                    ctoken.Token.WaitHandle.WaitOne();
-                    ffmpegProcess.WaitForExit();
-                });
-                var timeout = new TimeoutTimer(60);
-                var startProcessTimeout = new TimeoutTimer(10);
-                yield return new WaitUntil(() => IsProcessRunning(ffmpegProcess) || startProcessTimeout.HasTimedOut);
-                startProcessTimeout.Stop();
-                yield return new WaitUntil(() => !IsProcessRunning(ffmpegProcess) || timeout.HasTimedOut);
-                if (timeout.HasTimedOut)
-                {
-                    yield return new WaitForSeconds(5f);
-                    Plugin.Log?.Warn($"[{songAudioClipPath}] Timeout reached, disposing ffmpeg process");
-                }
-                else
-                    Task.WaitAll(outputRead, errorRead, processWait);
-                timeout.Stop();
-                ffmpegProcess.Close();
-                DisposeProcess(ffmpegProcess);
-            }
+            this.OnLoudnessSurveyUpdate?.Invoke(loudnessUpdate, levelID, loudnessData);
         }
 
         public async Task<string> GetSongAudioClipPathAsync(string levelID)
@@ -317,108 +218,6 @@ namespace LoudnessNormalizer.Models
                 }
             }
             return result;
-        }
-
-        public Process FFmpegProcess(string songAudioClipPath, string arguments)
-        {
-            if (this._ffmpegProcesses.TryGetValue(songAudioClipPath, out _))
-            {
-                Plugin.Log?.Warn("Existing process not cleaned up yet. Cancelling survey attempt.");
-                return null;
-            }
-            if (!File.Exists(songAudioClipPath))
-            {
-                Plugin.Log?.Warn("No song data");
-                return null;
-            }
-            if (!File.Exists(this._ffmpegFilepath))
-            {
-                Plugin.Log?.Warn("No ffmpeg.exe");
-                return null;
-            }
-            var process = new Process
-            {
-                StartInfo =
-                {
-                    FileName = this._ffmpegFilepath,
-                    Arguments = arguments,
-                    RedirectStandardError = true,
-                    StandardErrorEncoding = Encoding.UTF8,
-                    RedirectStandardOutput = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                },
-                EnableRaisingEvents = true,
-                PriorityBoostEnabled = false
-            };
-            this._ffmpegProcesses.TryAdd(songAudioClipPath, process);
-            return process;
-        }
-
-        public void FFmpegProcessDisposed(Process sender)
-        {
-            var disposedProcess = (Process)sender;
-            foreach (var dictionaryEntry in this._ffmpegProcesses.Where(keyValuePair => keyValuePair.Value == disposedProcess).ToList())
-            {
-                var songAudioClipPath = dictionaryEntry.Key;
-                var success = this._ffmpegProcesses.TryRemove(dictionaryEntry.Key, out _);
-                if (!success)
-                    UnityMainThreadTaskScheduler.Factory.StartNew(() => { Plugin.Log?.Error("Failed to remove disposed process from list of processes!"); });
-            }
-        }
-
-        public static void DisposeProcess(Process process)
-        {
-            if (process == null)
-                return;
-            int processId;
-            try
-            {
-                processId = process.Id;
-            }
-            catch (Exception)
-            {
-                return;
-            }
-            Plugin.Log?.Warn($"[{processId}] Cleaning up process");
-            Task.Run(() =>
-            {
-                try
-                {
-                    if (!process.HasExited)
-                        process.Kill();
-                }
-                catch (Exception exception)
-                {
-                    UnityMainThreadTaskScheduler.Factory.StartNew(() => Plugin.Log.Warn(exception));
-                }
-                try
-                {
-                    process.Dispose();
-                }
-                catch (Exception exception)
-                {
-                    UnityMainThreadTaskScheduler.Factory.StartNew(() => Plugin.Log.Warn(exception));
-                }
-            });
-        }
-
-        public static bool IsProcessRunning(Process process)
-        {
-            try
-            {
-                if (!process.HasExited)
-                    return true;
-            }
-            catch (Exception e)
-            {
-                if (!(e is InvalidOperationException))
-                {
-                    UnityEngine.Debug.LogWarning(e);
-                }
-            }
-            return false;
         }
     }
 }

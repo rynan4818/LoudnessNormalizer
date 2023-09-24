@@ -7,8 +7,9 @@ namespace LoudnessNormalizer.Installers
     {
         public override void InstallBindings()
         {
-            this.Container.BindInterfacesAndSelfTo<LoudnessNormalizerController>().AsSingle();
             this.Container.BindInterfacesAndSelfTo<SongDatabase>().AsSingle();
+            this.Container.BindInterfacesAndSelfTo<FFmpegController>().AsSingle();
+            this.Container.BindInterfacesAndSelfTo<LoudnessNormalizerController>().AsSingle();
         }
     }
 }

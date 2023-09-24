@@ -146,7 +146,7 @@
     <Compile Include="Installers\LoudnessNormalizerAppInstaller.cs" />
     <Compile Include="Installers\LoudnessNormalizerMenuInstaller.cs" />
     <Compile Include="Installers\LoudnessNormalizerPlayerInstaller.cs" />
-    <Compile Include="Interfaces\IBeatmapInfoUpdater.cs" />
+    <Compile Include="Models\FFmpegController.cs" />
     <Compile Include="Models\GameplaySceneController.cs" />
     <Compile Include="Models\LoudnessNormalizerController.cs" />
     <Compile Include="Models\UIManager.cs" />

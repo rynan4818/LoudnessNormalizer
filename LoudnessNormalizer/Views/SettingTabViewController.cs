@@ -11,7 +11,6 @@ namespace LoudnessNormalizer.Views
     public class SettingTabViewController :  IInitializable, IDisposable
     {
         private bool _disposedValue;
-        private LoudnessNormalizerController _loudnessNormalizerController;
         public static readonly string _buttonName = "PlayerInfoViewer";
         public string ResourceName => string.Join(".", this.GetType().Namespace, this.GetType().Name);
         [UIComponent("IntegratedLoudness")]
@@ -23,17 +22,9 @@ namespace LoudnessNormalizer.Views
         [UIComponent("CheckSongCount")]
         private readonly TextMeshProUGUI _checkSongCount;
 
-        [Inject]
-        public void Constractor(LoudnessNormalizerController loudnessNormalizerController)
-        {
-            this._loudnessNormalizerController = loudnessNormalizerController;
-        }
-
         public void Initialize()
         {
             GameplaySetup.instance.AddTab(Plugin.Name, this.ResourceName, this, MenuType.Solo);
-            this._loudnessNormalizerController.OnCheckSongCountUpdate += CheckSongCountUpdate;
-            this._loudnessNormalizerController.OnLoudnessUpdate += LoudnessUpdate;
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -42,8 +33,6 @@ namespace LoudnessNormalizer.Views
                 if (disposing)
                 {
                     GameplaySetup.instance?.RemoveTab(Plugin.Name);
-                    this._loudnessNormalizerController.OnCheckSongCountUpdate -= CheckSongCountUpdate;
-                    this._loudnessNormalizerController.OnLoudnessUpdate -= LoudnessUpdate;
                 }
                 this._disposedValue = true;
             }
@@ -71,9 +60,9 @@ namespace LoudnessNormalizer.Views
             }
         }
 
-        public void CheckSongCountUpdate(int count, int max)
+        public void CheckSongCountUpdate(int count)
         {
-            this._checkSongCount.text = $"Check Song Count : {count} / {max}";
+            this._checkSongCount.text = $"Check Song Count : {count} / {SongCore.Loader.CustomLevels.Count}";
         }
 
         [UIValue("AllSongCheck")]
@@ -82,6 +71,34 @@ namespace LoudnessNormalizer.Views
             get => PluginConfig.Instance.AllSongCheck;
             set => PluginConfig.Instance.AllSongCheck = value;
         }
+
+        [UIValue("Itarget")]
+        public float Itarget
+        {
+            get => PluginConfig.Instance.Itarget;
+            set => PluginConfig.Instance.Itarget = value;
+        }
+
+        [UIValue("LRAtarget")]
+        public float LRAtarget
+        {
+            get => PluginConfig.Instance.LRAtarget;
+            set => PluginConfig.Instance.LRAtarget = value;
+        }
+
+        [UIValue("TPtarget")]
+        public float TPtarget
+        {
+            get => PluginConfig.Instance.TPtarget;
+            set => PluginConfig.Instance.TPtarget = value;
+        }
+
+        [UIAction("LoudnessNormalization")]
+        public void LoudnessNormalization()
+        {
+
+        }
+
 
         [UIAction("#post-parse")]
         internal void PostParse()
