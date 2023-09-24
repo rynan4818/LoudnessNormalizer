@@ -1,12 +1,10 @@
 ﻿using LoudnessNormalizer.Configuration;
-using LoudnessNormalizer.Util;
 using System;
 using System.IO;
 using Zenject;
 using Newtonsoft.Json;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Collections;
-using UnityEngine;
 using System.Collections.Concurrent;
 
 namespace LoudnessNormalizer.Models
@@ -33,19 +31,21 @@ namespace LoudnessNormalizer.Models
     public class SongDatabase : IInitializable, IDisposable
     {
         private bool _disposedValue;
+        public static SemaphoreSlim SongDatabaseSemaphore = new SemaphoreSlim(1, 1);
         public ConcurrentDictionary<string, SongData> _songDatabase { get; set; } = new ConcurrentDictionary<string, SongData>();
         public bool _init;
-        public bool _writeDatabase = false;
+        public bool _songDatabaseChange = false;
         public void Initialize()
         {
             _= this.InitSongDatabaseAsync();
+            Plugin.OnPluginExit += BackupSongDatabase; //ファイルの書き込み処理はDisposeのときでは間に合わない
         }
         protected virtual void Dispose(bool disposing)
         {
             if (!this._disposedValue)
             {
                 if (disposing)
-                    this.BackupSongDatabase();
+                    Plugin.OnPluginExit -= BackupSongDatabase;
                 this._disposedValue = true;
             }
         }
@@ -78,85 +78,94 @@ namespace LoudnessNormalizer.Models
                 this._songDatabase[levelID] = songData;
             else
                 this._songDatabase.TryAdd(levelID, songData);
-            CoroutineStarter.Instance.StartCoroutine(SaveSongDatabaseCoroutine(levelID));
-        }
-        public IEnumerator SaveSongDatabaseCoroutine(string levelID)
-        {
-            yield return new WaitWhile(() => this._writeDatabase == true);
-            yield return this.SaveSongDatabaseAsync();
+            this._songDatabaseChange = true;
         }
 
         public async Task InitSongDatabaseAsync()
         {
-            Plugin.Log?.Info("Init Start");
             this._init = false;
-            if (!File.Exists(PluginConfig.Instance.SongDatabaseFile)) {
-                this._songDatabase = new ConcurrentDictionary<string, SongData>();
-                await this.SaveSongDatabaseAsync();
-                this._init = true;
-                return;
-            }
-            var json = await this.ReadAllTextAsync(PluginConfig.Instance.SongDatabaseFile);
-            try
+            Plugin.Log?.Info("Init Start");
+            this._songDatabase = await this.ReadSongDatabaseJsonAsync(PluginConfig.Instance.SongDatabaseFile);
+            if (this._songDatabase == null)
             {
-                if (json == null)
-                    throw new JsonReaderException("Json file error songdatabase");
-                this._songDatabase = JsonConvert.DeserializeObject<ConcurrentDictionary<string, SongData>>(json);
+                Plugin.Log?.Info("Restoring songdatabase backup");
+                this._songDatabase = await this.ReadSongDatabaseJsonAsync(Path.ChangeExtension(PluginConfig.Instance.SongDatabaseFile, ".bak"));
                 if (this._songDatabase == null)
-                    throw new JsonReaderException("Empty json songdatabase");
-            }
-            catch (JsonException ex)
-            {
-                Plugin.Log?.Error(ex.ToString());
-                var backup = new FileInfo(Path.ChangeExtension(PluginConfig.Instance.SongDatabaseFile, ".bak"));
-                if (backup.Exists && backup.Length > 0)
-                {
-                    Plugin.Log?.Info("Restoring songdatabase backup");
-                    try
-                    {
-                        json = await this.ReadAllTextAsync(backup.FullName);
-                        if (json == null)
-                            throw new JsonReaderException("Backup json file error songdatabase");
-                        this._songDatabase = JsonConvert.DeserializeObject<ConcurrentDictionary<string, SongData>>(json);
-                        if (this._songDatabase == null)
-                            throw new JsonReaderException("Failed restore songdatabase");
-                    }
-                    catch (JsonException ex2)
-                    {
-                        Plugin.Log?.Error(ex2.ToString());
-                        this._songDatabase = new ConcurrentDictionary<string, SongData>();
-                    }
-                }
-                else
                     this._songDatabase = new ConcurrentDictionary<string, SongData>();
+                this._songDatabaseChange = true;
                 await this.SaveSongDatabaseAsync();
             }
             this._init = true;
         }
         public async Task SaveSongDatabaseAsync()
         {
-            if (this._writeDatabase)
+            if (!this._songDatabaseChange)
                 return;
-            this._writeDatabase = true;
+            this._songDatabaseChange = false;
+            if (this._songDatabase.Count == 0)
+                return;
             try
             {
-                if (this._songDatabase.Count > 0)
-                {
-                    var serialized = JsonConvert.SerializeObject(this._songDatabase, Formatting.None);
-                    if (!await WriteAllTextAsync(PluginConfig.Instance.SongDatabaseFile, serialized))
-                        throw new Exception("Failed save songdatabase");
-                }
+                var serialized = JsonConvert.SerializeObject(this._songDatabase, Formatting.None);
+                if (!await this.WriteAllTextAsync(PluginConfig.Instance.SongDatabaseFile, serialized))
+                    throw new Exception("Failed save songdatabase");
             }
             catch (Exception ex)
             {
                 Plugin.Log?.Error(ex.ToString());
+                this._songDatabaseChange = true;
             }
-            this._writeDatabase = false;
+        }
+        public void SaveSongDatabase()
+        {
+            if (!this._songDatabaseChange)
+                return;
+            this._songDatabaseChange = false;
+            if (this._songDatabase.Count == 0)
+                return;
+            try
+            {
+                var serialized = JsonConvert.SerializeObject(this._songDatabase, Formatting.None);
+                File.WriteAllText(PluginConfig.Instance.SongDatabaseFile, serialized);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.Error(ex.ToString());
+                this._songDatabaseChange = true;
+            }
+        }
+        public bool CheckSongDatabaseFile()
+        {
+            try
+            {
+                var text = File.ReadAllText(PluginConfig.Instance.SongDatabaseFile);
+                var result = JsonConvert.DeserializeObject<ConcurrentDictionary<string, SongData>>(text);
+                if (result == null)
+                    return false;
+                else
+                    return true;
+            }
+            catch (Exception e)
+            {
+                Plugin.Log?.Error(e.ToString());
+                return false;
+            }
         }
         public void BackupSongDatabase()
         {
+            if (!this._init)
+                return;
+            this.SaveSongDatabase();
             if (!File.Exists(PluginConfig.Instance.SongDatabaseFile))
                 return;
+            Plugin.Log?.Info("Song database backup");
+            if (!this.CheckSongDatabaseFile())
+            {
+                this._songDatabaseChange = true;
+                this.SaveSongDatabase();
+                if (!this.CheckSongDatabaseFile())
+                    return;
+            }
             var backupFile = Path.ChangeExtension(PluginConfig.Instance.SongDatabaseFile, ".bak");
             try
             {
@@ -177,30 +186,75 @@ namespace LoudnessNormalizer.Models
                 Plugin.Log?.Error(ex.ToString());
             }
         }
+        public async Task<ConcurrentDictionary<string, SongData>> ReadSongDatabaseJsonAsync(string path)
+        {
+            ConcurrentDictionary<string, SongData> result;
+            var json = await this.ReadAllTextAsync(path);
+            try
+            {
+                if (json == null)
+                    throw new JsonReaderException($"Json file error {path}");
+                result = JsonConvert.DeserializeObject<ConcurrentDictionary<string, SongData>>(json);
+                if (result == null)
+                    throw new JsonReaderException($"Empty json {path}");
+            }
+            catch (JsonException ex)
+            {
+                Plugin.Log?.Error(ex.ToString());
+                result = null;
+            }
+            return result;
+        }
         public async Task<string> ReadAllTextAsync(string path)
         {
+            var fileInfo = new FileInfo(path);
+            if (!fileInfo.Exists || fileInfo.Length == 0)
+            {
+                Plugin.Log?.Info($"File not found : {path}");
+                return null;
+            }
+            string result;
+            await SongDatabaseSemaphore.WaitAsync();
             try
             {
                 using(var sr = new StreamReader(path))
-                    return await sr.ReadToEndAsync();
+                {
+                    result = await sr.ReadToEndAsync();
+                }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return null;
+                Plugin.Log?.Error(e.ToString());
+                result = null;
             }
+            finally
+            {
+                SongDatabaseSemaphore.Release();
+            }
+            return result;
         }
         public async Task<bool> WriteAllTextAsync(string path, string contents)
         {
+            bool result;
+            await SongDatabaseSemaphore.WaitAsync();
             try
             {
                 using(var sw = new StreamWriter(path))
+                {
                     await sw.WriteAsync(contents);
-                return true;
+                }
+                result = true;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return false;
+                Plugin.Log?.Error(e.ToString());
+                result = false;
             }
+            finally
+            {
+                SongDatabaseSemaphore.Release();
+            }
+            return result;
         }
     }
 }

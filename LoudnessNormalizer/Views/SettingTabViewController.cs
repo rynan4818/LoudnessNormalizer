@@ -1,6 +1,5 @@
 ﻿using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.GameplaySetup;
-using BeatSaberMarkupLanguage.ViewControllers;
 using LoudnessNormalizer.Configuration;
 using LoudnessNormalizer.Models;
 using System;
@@ -9,7 +8,7 @@ using Zenject;
 
 namespace LoudnessNormalizer.Views
 {
-    public class SettingTabViewController : BSMLAutomaticViewController, IInitializable, IDisposable
+    public class SettingTabViewController :  IInitializable, IDisposable
     {
         private bool _disposedValue;
         private LoudnessNormalizerController _loudnessNormalizerController;

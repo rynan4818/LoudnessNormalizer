@@ -16,7 +16,7 @@ using System.Text.RegularExpressions;
 
 namespace LoudnessNormalizer.Models
 {
-    public class LoudnessNormalizerController : IBeatmapInfoUpdater, IDisposable
+    public class LoudnessNormalizerController : IBeatmapInfoUpdater
     {
         private BeatmapLevelsModel _beatmapLevelsModel;
         private SongDatabase _songDatabase;
@@ -35,6 +35,8 @@ namespace LoudnessNormalizer.Models
         public readonly string _ffmpegFilepath = Path.Combine(UnityGame.LibraryPath, "ffmpeg.exe");
         public event Action<LoudnessData> OnLoudnessUpdate;
         public event Action<int, int> OnCheckSongCountUpdate;
+        public string _selectCheckLevelID;
+        public string _allCheckLevelID;
         public bool _allSongCheckerActive { get; set; } = false;
         public bool _allSongCheckerBreak { get; set; } = false;
         public bool _allSongCheckDone { get; set; } = false;
@@ -45,21 +47,6 @@ namespace LoudnessNormalizer.Models
         {
             this._beatmapLevelsModel = beatmapLevelsModel;
             this._songDatabase = songDatabase;
-        }
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!this._disposedValue)
-            {
-                if (disposing)
-                    this._allSongCheckerBreak = true;
-                this._disposedValue = true;
-            }
-        }
-        public void Dispose()
-        {
-            // このコードを変更しないでください。クリーンアップ コードを 'Dispose(bool disposing)' メソッドに記述します
-            this.Dispose(disposing: true);
-            GC.SuppressFinalize(this);
         }
 
         public void BeatmapInfoUpdated(IDifficultyBeatmap beatmap)
@@ -74,7 +61,7 @@ namespace LoudnessNormalizer.Models
             LoudnessData loudnessData = null;
             if (songData.Org == null)
             {
-                CoroutineStarter.Instance.StartCoroutine(this.LoudnessSurveyCoroutine(levelID, songData, true));
+                CoroutineStarter.Instance.StartCoroutine(SlectSongCheckerCoroutine(levelID, songData));
             }
             else
             {
@@ -90,7 +77,15 @@ namespace LoudnessNormalizer.Models
             this.OnLoudnessUpdate?.Invoke(loudnessData);
         }
 
-        public IEnumerator AllSongChekerCoroutine()
+        public IEnumerator SlectSongCheckerCoroutine(string levelID, SongData songData)
+        {
+            this._selectCheckLevelID = levelID;
+            yield return new WaitWhile(() => this._allCheckLevelID == levelID);
+            yield return this.LoudnessSurveyCoroutine(levelID, songData, true);
+            this._selectCheckLevelID = null;
+        }
+
+        public IEnumerator AllSongCheckerCoroutine()
         {
             if (!this._songDatabase._init)
                 yield break;
@@ -104,7 +99,7 @@ namespace LoudnessNormalizer.Models
             var count = 0;
             foreach (string key in allSong.Keys)
             {
-                if (this._allSongCheckerBreak)
+                if (this._allSongCheckerBreak || this._gameSceneActive)
                 {
                     this._allSongCheckerActive = false;
                     this._allSongCheckerBreak = false;
@@ -117,7 +112,11 @@ namespace LoudnessNormalizer.Models
                 if (songData.Org == null)
                 {
                     Plugin.Log.Info($"{count}/{max}:{levelID}");
+                    this._allCheckLevelID = levelID;
+                    if (this._selectCheckLevelID == levelID)
+                        continue;
                     yield return this.LoudnessSurveyCoroutine(levelID, songData, false, true, songPreviewAudioClipPath);
+                    this._allCheckLevelID = null;
                 }
             }
             this._allSongCheckCount = max;
@@ -155,12 +154,14 @@ namespace LoudnessNormalizer.Models
             }
             if (songAudioClipPath == null)
                 yield break;
+            var ffmpeg_error = true;
             yield return FFmpegRunCoroutine(outputLine => { }, errorLine =>
             {
                 float value;
                 var match = VolumedetectRegex.Match(errorLine);
                 if (match.Success)
                 {
+                    ffmpeg_error = false;
                     switch (match.Groups[1].Value)
                     {
                         case "mean_volume":
@@ -175,6 +176,9 @@ namespace LoudnessNormalizer.Models
                 }
             }, songAudioClipPath, VolumedetectOption);
             yield return new WaitWhile(() => this._ffmpegProcesses.TryGetValue(songAudioClipPath, out _));
+            if (ffmpeg_error)
+                yield break;
+            ffmpeg_error = true;
             yield return FFmpegRunCoroutine(outputLine => { }, errorLine =>
             {
                 var integratedLoundness = true;
@@ -186,6 +190,7 @@ namespace LoudnessNormalizer.Models
                 var match = Ebur128Regex.Match(errorLine);
                 if (match.Success)
                 {
+                    ffmpeg_error = false;
                     switch (match.Groups[1].Value)
                     {
                         case "I":
@@ -216,6 +221,8 @@ namespace LoudnessNormalizer.Models
                 }
             }, songAudioClipPath, Ebur128Option);
             yield return new WaitWhile(() => this._ffmpegProcesses.TryGetValue(songAudioClipPath, out _));
+            if (ffmpeg_error)
+                yield break;
             if (original)
                 songData.Org = loudnessData;
             else

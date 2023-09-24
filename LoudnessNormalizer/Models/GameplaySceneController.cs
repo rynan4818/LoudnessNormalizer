@@ -21,7 +21,9 @@ namespace LoudnessNormalizer.Models
             if (!this._disposedValue)
             {
                 if (disposing)
+                {
                     this._loudnessNormalizerController._gameSceneActive = false;
+                }
                 this._disposedValue = true;
             }
         }

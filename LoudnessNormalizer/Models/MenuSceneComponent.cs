@@ -52,7 +52,7 @@ namespace LoudnessNormalizer.Models
         {
             if (!this._songDatabase._init)
                 return;
-            if (SongCore.Loader.AreSongsLoading || !this._loudnessNormalizerUIManager._leaderboardActivated || !PluginConfig.Instance.AllSongCheck || this._loudnessNormalizerController._gameSceneActive)
+            if (SongCore.Loader.AreSongsLoading || !this._loudnessNormalizerUIManager._leaderboardActivated || !PluginConfig.Instance.AllSongCheck)
             {
                 if (this._loudnessNormalizerController._allSongCheckerActive)
                     this._loudnessNormalizerController._allSongCheckerBreak = true;
@@ -61,7 +61,7 @@ namespace LoudnessNormalizer.Models
             if (this._loudnessNormalizerController._allSongCheckDone && this._loudnessNormalizerController._allSongCheckCount == SongCore.Loader.CustomLevels.Count)
                 return;
             if (!this._loudnessNormalizerController._allSongCheckerActive)
-                CoroutineStarter.Instance.StartCoroutine(this._loudnessNormalizerController.AllSongChekerCoroutine());
+                CoroutineStarter.Instance.StartCoroutine(this._loudnessNormalizerController.AllSongCheckerCoroutine());
         }
 
         /// <summary>

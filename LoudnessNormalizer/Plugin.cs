@@ -1,16 +1,10 @@
 ﻿using LoudnessNormalizer.Installers;
-using LoudnessNormalizer.HarmonyPatches;
 using HarmonyLib;
 using IPA;
 using IPA.Config;
 using IPA.Config.Stores;
 using SiraUtil.Zenject;
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using UnityEngine;
-using UnityEngine.SceneManagement;
 using IPALogger = IPA.Logging.Logger;
 using System.Reflection;
 
@@ -22,6 +16,7 @@ namespace LoudnessNormalizer
         public static Harmony _harmony;
         public const string HARMONY_ID = "com.github.rynan4818.LoudnessNormalizer";
         public static string Name => "LoudnessNormalizer";
+        public static event Action OnPluginExit;
         internal static Plugin Instance { get; private set; }
         internal static IPALogger Log { get; private set; }
 
@@ -59,6 +54,7 @@ namespace LoudnessNormalizer
         public void OnApplicationQuit()
         {
             Log.Debug("OnApplicationQuit");
+            OnPluginExit?.Invoke();
             _harmony?.UnpatchSelf();
         }
     }
