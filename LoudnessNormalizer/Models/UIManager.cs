@@ -33,6 +33,8 @@ namespace LoudnessNormalizer.Models
             this._platformLeaderboardViewController.didActivateEvent += this.OnLeaderboardActivated;
             this._platformLeaderboardViewController.didDeactivateEvent += this.OnLeaderboardDeactivated;
             this._loudnessNormalizerController.OnLoudnessSurveyUpdate += this.OnLoudnessSurveyUpdate;
+            this._loudnessNormalizerController.OnLoudnormProgress += this.OnLoudnormProgress;
+            this._settingTabViewController.OnLoudnessNormalization += this.OnLoudnessNormalization;
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -45,6 +47,8 @@ namespace LoudnessNormalizer.Models
                     this._platformLeaderboardViewController.didDeactivateEvent -= this.OnLeaderboardDeactivated;
                     this._platformLeaderboardViewController.didActivateEvent -= this.OnLeaderboardActivated;
                     this._loudnessNormalizerController.OnLoudnessSurveyUpdate -= this.OnLoudnessSurveyUpdate;
+                    this._loudnessNormalizerController.OnLoudnormProgress -= this.OnLoudnormProgress;
+                    this._settingTabViewController.OnLoudnessNormalization -= this.OnLoudnessNormalization;
                 }
                 this._disposedValue = true;
             }
@@ -109,6 +113,14 @@ namespace LoudnessNormalizer.Models
         {
             this._leaderboardActivated = false;
             _= this._songDatabase.SaveSongDatabaseAsync();
+        }
+        public void OnLoudnormProgress(string progress)
+        {
+            this._settingTabViewController.ProgressUpdate(progress);
+        }
+        public void OnLoudnessNormalization()
+        {
+            CoroutineStarter.Instance.StartCoroutine(this._loudnessNormalizerController.LoudnessChangeCoroutine(this._selectedBeatmap.level.levelID));
         }
     }
 }

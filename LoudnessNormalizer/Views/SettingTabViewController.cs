@@ -13,6 +13,7 @@ namespace LoudnessNormalizer.Views
         private bool _disposedValue;
         public static readonly string _buttonName = "PlayerInfoViewer";
         public string ResourceName => string.Join(".", this.GetType().Namespace, this.GetType().Name);
+        public event Action OnLoudnessNormalization;
         [UIComponent("IntegratedLoudness")]
         public readonly TextMeshProUGUI _integratedLoudness;
         [UIComponent("LoudnessRange")]
@@ -21,6 +22,8 @@ namespace LoudnessNormalizer.Views
         public readonly TextMeshProUGUI _volumedetect;
         [UIComponent("CheckSongCount")]
         private readonly TextMeshProUGUI _checkSongCount;
+        [UIComponent("NormalizationProgress")]
+        private readonly TextMeshProUGUI _normalizationProgress;
 
         public void Initialize()
         {
@@ -60,6 +63,11 @@ namespace LoudnessNormalizer.Views
             }
         }
 
+        public void ProgressUpdate(string progress)
+        {
+            this._normalizationProgress.text = progress;
+        }
+
         public void CheckSongCountUpdate(int count)
         {
             this._checkSongCount.text = $"Check Song Count : {count} / {SongCore.Loader.CustomLevels.Count}";
@@ -96,14 +104,13 @@ namespace LoudnessNormalizer.Views
         [UIAction("LoudnessNormalization")]
         public void LoudnessNormalization()
         {
-
+            OnLoudnessNormalization?.Invoke();
         }
 
 
         [UIAction("#post-parse")]
         internal void PostParse()
         {
-            // Code to run after BSML finishes
         }
     }
 }

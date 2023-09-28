@@ -18,9 +18,10 @@ namespace LoudnessNormalizer.Models
     {
         public readonly string _ffmpegFilepath = Path.Combine(UnityGame.LibraryPath, "ffmpeg.exe");
         public readonly ConcurrentDictionary<string, Process> _ffmpegProcesses = new ConcurrentDictionary<string, Process>();
-        public IEnumerator FFmpegRunCoroutine(Action<string> outputLine, Action<string> errorLine, string songAudioClipPath, string option)
+        public IEnumerator FFmpegRunCoroutine(string songAudioClipPath, string option, Action<string> outputLine, Action<string> errorLine)
         {
             var arguments = $"-i \"{songAudioClipPath}\" {option}";
+            Plugin.Log?.Debug($"ffmpeg {arguments}");
             using (var ffmpegProcess = FFmpegProcess(songAudioClipPath, arguments))
             using (var ctoken = new CancellationTokenSource())
             {
