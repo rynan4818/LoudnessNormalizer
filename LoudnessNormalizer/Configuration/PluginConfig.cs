@@ -14,6 +14,7 @@ namespace LoudnessNormalizer.Configuration
         public virtual float Itarget { get; set; } = -7.7f;
         public virtual float LRAtarget { get; set; } = 5.2f;
         public virtual float TPtarget { get; set; } = -2.0f;
+        public virtual bool LRAunchanged { get; set; } = true;
 
         /// <summary>
         /// これは、BSIPAが設定ファイルを読み込むたびに（ファイルの変更が検出されたときを含めて）呼び出されます

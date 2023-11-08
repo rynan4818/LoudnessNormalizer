@@ -31,6 +31,7 @@ namespace LoudnessNormalizer.Models
         public CancellationTokenSource _cancellationTokenSource;
         public event Action<bool, string, LoudnessData> OnLoudnessSurveyUpdate;
         public event Action<string> OnLoudnormProgress;
+        public event Action<float, float, float> OnLoudnessCheckResult;
         public string _selectCheckLevelID;
         public string _allCheckLevelID;
         public bool _allSongCheckerActive { get; set; } = false;
@@ -93,6 +94,22 @@ namespace LoudnessNormalizer.Models
             this._allSongCheckerActive = false;
         }
 
+        public IEnumerator CheckLoudness(string levelID)
+        {
+            var songAudioClipPath = GetSongAudioClipPath(levelID);
+            if (songAudioClipPath == null)
+                yield break;
+            var error = true;
+            this.OnLoudnormProgress?.Invoke($"Analyzing...");
+            yield return this.LoudnormCoroutine(songAudioClipPath, LoudnormSurveyOption1 + LoudnormSurveyOption2, (input_i, input_tp, input_lra, input_thresh, target_offset, dynamic) => {
+                Plugin.Log.Info($"{levelID}:1:{input_i}:{input_tp}:{input_lra}:{input_thresh}:{target_offset}");
+                this.OnLoudnessCheckResult?.Invoke(input_i, input_tp, input_lra);
+                error = false;
+            });
+            if (error)
+                yield break;
+        }
+
         public IEnumerator LoudnessChangeCoroutine(string levelID)
         {
             Plugin.Log.Info($"{levelID}:0");
@@ -111,7 +128,10 @@ namespace LoudnessNormalizer.Models
             this.OnLoudnormProgress?.Invoke($"Analyzing...");
             yield return this.LoudnormCoroutine(songAudioClipPath, option, (input_i, input_tp, input_lra, input_thresh, target_offset, dynamic) => {
                 Plugin.Log.Info($"{levelID}:1:{input_i}:{input_tp}:{input_lra}:{input_thresh}:{target_offset}");
-                option = $"{LoudnormSurveyOption1}I={PluginConfig.Instance.Itarget}:TP={PluginConfig.Instance.TPtarget}:LRA={PluginConfig.Instance.LRAtarget}:" +
+                var lra = PluginConfig.Instance.LRAtarget;
+                if (PluginConfig.Instance.LRAunchanged)
+                    lra = input_lra;
+                option = $"{LoudnormSurveyOption1}I={PluginConfig.Instance.Itarget}:TP={PluginConfig.Instance.TPtarget}:LRA={lra}:" +
                     $"measured_I={input_i}:measured_TP={input_tp}:measured_LRA={input_lra}:measured_thresh={input_thresh}:offset={target_offset}:" +
                     $"print_format=json,channelmap=channel_layout=stereo,aresample=48000\" -aq 9 -acodec libvorbis \"{dir}\\{cng_songfile}\"";
                 error = false;

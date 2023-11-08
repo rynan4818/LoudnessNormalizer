@@ -1,4 +1,5 @@
-﻿using LoudnessNormalizer.Util;
+﻿using LoudnessNormalizer.Configuration;
+using LoudnessNormalizer.Util;
 using LoudnessNormalizer.Views;
 using System;
 using Zenject;
@@ -34,7 +35,9 @@ namespace LoudnessNormalizer.Models
             this._platformLeaderboardViewController.didDeactivateEvent += this.OnLeaderboardDeactivated;
             this._loudnessNormalizerController.OnLoudnessSurveyUpdate += this.OnLoudnessSurveyUpdate;
             this._loudnessNormalizerController.OnLoudnormProgress += this.OnLoudnormProgress;
+            this._loudnessNormalizerController.OnLoudnessCheckResult += this.OnLoudnessCheckResult;
             this._settingTabViewController.OnLoudnessNormalization += this.OnLoudnessNormalization;
+            this._settingTabViewController.OnCheckLoudness += this.OnCheckLoudness;
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -48,7 +51,9 @@ namespace LoudnessNormalizer.Models
                     this._platformLeaderboardViewController.didActivateEvent -= this.OnLeaderboardActivated;
                     this._loudnessNormalizerController.OnLoudnessSurveyUpdate -= this.OnLoudnessSurveyUpdate;
                     this._loudnessNormalizerController.OnLoudnormProgress -= this.OnLoudnormProgress;
+                    this._loudnessNormalizerController.OnLoudnessCheckResult -= this.OnLoudnessCheckResult;
                     this._settingTabViewController.OnLoudnessNormalization -= this.OnLoudnessNormalization;
+                    this._settingTabViewController.OnCheckLoudness -= this.OnCheckLoudness;
                 }
                 this._disposedValue = true;
             }
@@ -114,9 +119,20 @@ namespace LoudnessNormalizer.Models
             this._leaderboardActivated = false;
             _= this._songDatabase.SaveSongDatabaseAsync();
         }
+        public void OnLoudnessCheckResult(float input_i, float input_tp, float input_lra)
+        {
+            var max_i = input_i - input_tp;
+            this._settingTabViewController.LoudnessSettingUpdate(max_i, input_lra);
+        }
+
         public void OnLoudnormProgress(string progress)
         {
             this._settingTabViewController.ProgressUpdate(progress);
+        }
+
+        public void OnCheckLoudness()
+        {
+            CoroutineStarter.Instance.StartCoroutine(this._loudnessNormalizerController.CheckLoudness(this._selectedBeatmap.level.levelID));
         }
         public void OnLoudnessNormalization()
         {

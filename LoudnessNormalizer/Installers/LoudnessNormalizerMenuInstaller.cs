@@ -8,7 +8,7 @@ namespace LoudnessNormalizer.Installers
     {
         public override void InstallBindings()
         {
-            this.Container.BindInterfacesAndSelfTo<SettingTabViewController>().AsSingle().NonLazy();
+            this.Container.BindInterfacesAndSelfTo<SettingTabViewController>().FromNewComponentAsViewController().AsSingle().NonLazy();
             this.Container.BindInterfacesAndSelfTo<UIManager>().AsSingle().NonLazy();
             this.Container.BindInterfacesAndSelfTo<MenuSceneComponent>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
             //this.Container.BindInterfacesAndSelfTo<ConfigViewController>().FromNewComponentAsViewController().AsSingle().NonLazy();
